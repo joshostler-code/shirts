@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -309,7 +310,7 @@
   <footer>Family shirt order · Submissions go directly to the organizer</footer>
 
   <script>
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzQQGW6zAI5hxpWLvVlB09Cyf0zIuruuuRq_BJMIGlvujzZVw4b4fAw4CKjPfqJgKOk/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0l907rckBPtbjBSkA_SMhLYiuQ0xUMhywqwUGZFVueoNp9Xmr-2RfwLi8lT_Ldeig/exec';
 
     const SIZES = {
       adult:   ['S','M','L','XL','2XL','3XL','4XL'],
@@ -390,7 +391,7 @@
       selections = {};
     }
 
-    async function submitForm() {
+    function submitForm() {
       const name = document.getElementById('member-name').value.trim();
       if (!name) {
         document.getElementById('member-name').focus();
@@ -406,26 +407,43 @@
       btn.disabled = true;
       setMsg('loading', 'Submitting your order...');
 
-      // Build a flat payload
+      // Build flat payload
       const payload = { name, timestamp: new Date().toISOString() };
       ALL_SIZES.forEach(s => { payload[s] = selections[s] || 0; });
 
-      try {
-        await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        // no-cors means we can't read the response — assume success
+      // Hidden iframe + form POST — bypasses CORS issues with Apps Script entirely
+      const iframeName = 'hidden_iframe_' + Date.now();
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = APPS_SCRIPT_URL;
+      form.target = iframeName;
+      form.style.display = 'none';
+
+      Object.entries(payload).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+
+      iframe.onload = function () {
         resetForm();
-        setMsg('success', '🎉 Your sizes have been submitted! Thanks, ' + name + '.');
+        setMsg('success', '\u{1F389} Your sizes have been submitted! Thanks, ' + name + '.');
         setTimeout(clearMsg, 6000);
-      } catch (err) {
-        setMsg('error', 'Something went wrong. Please check your connection and try again.');
-      } finally {
         btn.disabled = false;
-      }
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+      };
+
+      form.submit();
     }
 
     buildSizes(SIZES.adult,   'adult-sizes');
